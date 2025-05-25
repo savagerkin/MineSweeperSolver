@@ -4,6 +4,7 @@ import customtkinter
 from PIL import Image
 from PIL import ImageGrab
 from pynput.mouse import Controller, Button
+import time
 
 error_label = None
 
@@ -13,15 +14,16 @@ def destroyColRowInput():
 
     col_val = colum_var.get()
     row_val = row_var.get()
+    mine_val = mine_var.get()
 
     error_message = None
 
     # Check if inputs are empty
-    if col_val == "" or row_val == "":
-        error_message = "Please enter both row and column values."
+    if col_val == "" or row_val == "" or mine_val == "":
+        error_message = "Please enter both row, column, and mine values."
     # Check if inputs are not integers
-    elif not col_val.isdigit() or not row_val.isdigit():
-        error_message = "Row and column must be integers."
+    elif not col_val.isdigit() or not row_val.isdigit() or not mine_val.isdigit():
+        error_message = "Row, column, and mine number must be integers."
 
     if error_message:
         if error_label is None:
@@ -43,6 +45,8 @@ def destroyColRowInput():
     titleColumn.destroy()
     title.destroy()
     setValues.destroy()
+    mineTitle.destroy()
+    nuMine.destroy()
     # Start second step
 
     secondStart()
@@ -78,6 +82,15 @@ titleRow.pack(padx=10, pady=10)
 row_var = tkinter.StringVar()
 nuRow = customtkinter.CTkEntry(app, textvariable=row_var, placeholder_text="Number of rows")
 nuRow.pack(padx=10, pady=10)
+
+# Mine no input
+mineTitle = customtkinter.CTkLabel(app, text="Number of mines:", font=("Arial", 16))
+mineTitle.pack(padx=10, pady=10)
+
+mine_var = tkinter.StringVar()
+nuMine = customtkinter.CTkEntry(app, textvariable=mine_var, placeholder_text="Number of mines")
+nuMine.pack(padx=10, pady=10)
+
 
 # Set button
 setValues = customtkinter.CTkButton(app, text="Set values", command=destroyColRowInput)
@@ -146,7 +159,6 @@ def secondStart():
     app.bind("<KeyPress-S>", on_key_press)
 
 
-import time
 
 
 def finalStep():
@@ -160,9 +172,9 @@ def finalStep():
     printBoxColors()
     turnColorToNo()
 
-    solveMineSweeeper()
+    solveMineSweeper()
 
-def solveMineSweeeper():
+def solveMineSweeper():
     global value_grid
 
     # If the value_gripd is empty, print an error message
@@ -171,13 +183,33 @@ def solveMineSweeeper():
         return
     #Logic part now to solve the minesweeper
 
-
+    #Rule 0: Repeat until all mines are found, from the user input at the beginning.
     #Rule 1: If a box has a value of X, and only has X non-opened-neighbor, that neighbor is a mine.
 
-    #Rule 2: If a box has a value of X, and we already know that it has neighboring "X" mines, click all other non-opened-neighbors of that box that is not a mine
+    #Rule 2: If a box has a value of X, and we already know that it has neighboring "X" mines,
+    # click all other non-opened-neighbors of that box that is not a mine
 
+def turnColorToNo():
+    global grid_colors
 
+    if not grid_colors:
+        print("No colors to convert.")
+        return
 
+    global value_grid
+    value_grid = []
+    for r, row in enumerate(grid_colors):
+        value_row = []
+        for c, rgb in enumerate(row):
+            if rgb == "unopened":
+                value_row.append(0)
+            else:
+                value_row.append(classify_color(rgb))
+        value_grid.append(value_row)
+
+    for r, row in enumerate(value_grid):
+        for c, value in enumerate(row):
+            print(f"Box [{r}][{c}] has value: {value}")
 
 
 
@@ -230,20 +262,36 @@ def printBoxColors():
     grid_colors = []  # Initialize the 2D array to store colors
     screenshot = ImageGrab.grab()  # Take screenshot once for performance
 
+    num_rows = len(grid_centers)
+    num_cols = len(grid_centers[0])
+    box_height = (bottomRightPosition[1] - topLeftPosition[1]) / num_rows
+
+    white_edge_offset = int(box_height * 0.08)
+
     for r, row in enumerate(grid_centers):
         color_row = []
         for c, (x, y) in enumerate(row):
-            color = screenshot.getpixel((x, y))
-            color_row.append(color)
-            print(f"Box [{r}][{c}] at ({x}, {y}) has color: {color}")
+            # Sample the top edge to detect the white stripe
+            top_edge_y = int(y - (box_height / 2) + white_edge_offset)
+            top_edge_color = screenshot.getpixel((x, top_edge_y))
+
+            center_color = screenshot.getpixel((x, y))
+
+            if top_edge_color == (255, 255, 255):  # Detect white edge
+                print(f"Box [{r}][{c}] is UNOPENED (has white top edge)")
+                color_row.append("unopened")
+            else:
+                color_row.append(center_color)
+                print(f"Box [{r}][{c}] at ({x}, {y}) has color: {center_color}")
+
         grid_colors.append(color_row)
+
 
 
 def classify_color(rgb):
     r, g, b = rgb
 
-    # Simple threshold-based classification
-    if 100 < r < 200 and 100 < g < 200 and 100 < b < 200:
+    if 185 < r < 195 and 185 < g < 195 and 185 < b < 195:
         return None  # Gray
     elif r > 200:
         return 3  # Red
@@ -252,27 +300,9 @@ def classify_color(rgb):
     elif b > 200:
         return 1  # Blue
 
-    else:
-        return None  # Default to None for unclassified colors
 
 
-def turnColorToNo():
-    global grid_colors
 
-    if not grid_colors:
-        print("No colors to convert.")
-        return
-
-    global value_grid
-    value_grid = []
-    for row in grid_colors:
-        value_row = [classify_color(rgb) for rgb in row]
-        value_grid.append(value_row)
-
-    # Print or return the values
-    for r, row in enumerate(value_grid):
-        for c, value in enumerate(row):
-            print(f"Box [{r}][{c}] has value: {value}")
 
 
 # Run app
